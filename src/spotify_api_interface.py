@@ -7,6 +7,7 @@ import base64
 import requests
 import time
 import json
+import logging
 
 LENGTH = 16
 code_verifier = "".join(
@@ -71,7 +72,7 @@ def get_token(
     authorization_code = query_params.get("code", [None])[0]
 
     if not authorization_code:
-        print("Authorization code not found in the URL.")
+        logging.error("Authorization code not found in the URL.")
         return None
 
     token_url = "https://accounts.spotify.com/api/token"
@@ -104,8 +105,14 @@ def get_user_href(access_token):
     private_info_url = "https://api.spotify.com/v1/me"
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(private_info_url, headers=headers)
-    response_data = response.json()
-    return response_data["href"]
+    if response.status_code == 200:
+        logging.info("Tracks added to the playlist successfully")
+        response_data = response.json()
+        return response_data["href"]
+    else:
+        logging.warn("Failed to add tracks to the playlist")
+        logging.error("Response: %s", response.text)
+        exit()
 
 
 def create_and_populate_playlist(
@@ -141,12 +148,12 @@ def create_and_populate_playlist(
             )
 
         if response.status_code == 201:
-            print("Tracks added to the playlist successfully")
+            logging.info("Tracks added to the playlist successfully")
         else:
-            print("Failed to add tracks to the playlist")
-            print("Response:", response.text)
+            logging.warn("Failed to add tracks to the playlist")
+            logging.error("Response: %s", response.text)
     else:
-        print("Failed to create the playlist")
+        logging.error("Failed to create the playlist")
 
 
 def create_playlist(
@@ -191,11 +198,9 @@ def create_playlist(
         response_data = response.json()
     else:
         # Request failed
-        print("Request failed with status code:", response.status_code)
-        print(response.text)
-        print("didn't work :(")
+        logging.error("Request failed with status code: %s %s", response.status_code, response.text)
         if response.status_code == 429:
-            print("sleeping  30s because we get to many requests error")
+            logging.warn("sleeping  30s because we get to many requests error")
             time.sleep(30)
     return response_data["id"]
 
@@ -286,19 +291,19 @@ def get_all_tracks_from_playlists(access_token, playlists):
                     unique_track_ids.append(track_id)
                     unique_tracks.append(track["track"])
             except TypeError as e:
-                print(f"Error: {e}")
+                logging.error("Error: %s", e)
 
     return unique_tracks
 
 
 def get_all_artists_listenned_to(access_token):
-    print("getting all top tracks ...")
+    logging.info("getting all top tracks ...")
     all_top_tracks = get_user_items(access_token, "tracks")
-    print("getting all top artists ...")
+    logging.info("getting all top artists ...")
     all_top_artists = get_user_items(access_token, "artists")
-    print("getting all playlists ...")
+    logging.info("getting all playlists ...")
     all_playlists = get_user_items(access_token, "playlists")
-    print("getting all playlist tracks ...")
+    logging.info("getting all playlist tracks ...")
     all_playlists_tracks = get_all_tracks_from_playlists(
         access_token,
         all_playlists
@@ -326,7 +331,6 @@ def get_all_artists_listenned_to(access_token):
                 unique_artists_ids.add(artist_id)
                 merged_artists.append(artist)
 
-    print("number of individual_artists ", len(merged_artists))
     return merged_artists
 
 
@@ -351,19 +355,15 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist):
         return recommended_tracks["tracks"]
     else:
         # Request failed
-        print("Request failed with status code:", response.status_code)
-        print(response.text)
-        print("didn't work :(")
+        logging.warn("Recommendation request failed with status code:", response.status_code, response.text)
         if response.status_code == 429:
-            print("sleeping  30s because we get to many requests error")
+            logging.warn("sleeping  30s because we get to many requests error")
             time.sleep(30)
     return []
 
 
 def create_track_list(access_token, all_artists, length=100):
     genres_dict = {}
-    with open("all_artists.txt", "w") as file:
-        json.dump(all_artists, file)
     for artist in all_artists:
         if "genres" in artist and artist["genres"]:
             for genre in artist["genres"]:
@@ -372,12 +372,12 @@ def create_track_list(access_token, all_artists, length=100):
                 else:
                     genres_dict[genre].append(artist["id"])
     all_artists_ids = [artist["id"] for artist in all_artists]
-    print("number of music genres ", len(genres_dict))
-    print("number of artist ids ", len(all_artists_ids))
+    logging.info("number of music genres %s", len(genres_dict))
+    logging.info("number of artist ids %s", len(all_artists_ids))
 
     track_list = []
     artists_in_track_list_already = []
-    print("cooking playlist ... (it will take at least 100s)")
+    logging.info("cooking playlist ... (it will take at least 100s)")
     for _ in range(50):
         random_genre = random.choice(list(genres_dict.keys()))
         random_artist = random.choice(genres_dict[random_genre])
@@ -390,32 +390,28 @@ def create_track_list(access_token, all_artists, length=100):
             ]
             add_track = True
             for recommended_artist_id_in_track in recommended_artist_ids_in_track: # noqa: E501, E261
-                if recommended_artist_id_in_track in artists_in_track_list_already: # noqa: E501, E261
+                if recommended_artist_id_in_track in artists_in_track_list_already:
                     add_track = False
-                    print(
-                        track["name"],
-                        " not added (artist already in tracklist)",
+                    logging.info(
+                        "%s not added (artist already in generated tracklist)", track["name"]
                     )
-                elif recommended_artist_id_in_track in all_artists_ids:
+                elif recommended_artist_id_in_track in all_artists_ids and add_track:
                     add_track = False
-                    print(
-                        track["name"],
-                        " not added (artist already in tracklist)",
-                    )
-                elif track in track_list:
+                    logging.info(
+                        "%s not added (artist already in list of listened artists)", track["name"]
+                    ) 
+                elif track in track_list and add_track:
                     add_track = False
-                    print(
-                        track["name"],
-                        " not added (artist already in tracklist)",
+                    logging.info(
+                        "%s not added (track already in generated tracklist)", track["name"]
                     )
             if add_track:
                 track_list.append(track)
                 for artist_id in recommended_artist_ids_in_track:
                     artists_in_track_list_already.append(artist_id)
-                # print (track["name"], " added to list")
 
         if len(track_list) > length:
             break
         time.sleep(5)
-    print("cooking finished :)")
+    logging.info("cooking finished :)")
     return track_list

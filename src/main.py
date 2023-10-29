@@ -9,7 +9,8 @@ from spotify_api_interface import (
 
 from dotenv import load_dotenv
 import os
-
+import logging
+logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 def main():
     # Load environment variables from the .env file
@@ -17,10 +18,8 @@ def main():
 
     # Access the client ID from the environment
     client_id = os.getenv("CLIENT_ID")
-    if client_id:
-        print(f"Developer Client ID: {client_id}")
-    else:
-        print("Client ID not found in the .env file.")
+    if not client_id:
+        logging.error("Client ID not found in the .env file.")
         exit()
     # TODO: reduce the scope to only necessary
     access_token = get_token(
