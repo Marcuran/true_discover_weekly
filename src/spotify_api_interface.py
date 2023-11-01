@@ -6,7 +6,6 @@ import hashlib
 import base64
 import requests
 import time
-import json
 import logging
 
 LENGTH = 16
@@ -106,11 +105,11 @@ def get_user_href(access_token):
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(private_info_url, headers=headers)
     if response.status_code == 200:
-        logging.info("Tracks added to the playlist successfully")
+        logging.info("href fetched successfully")
         response_data = response.json()
         return response_data["href"]
     else:
-        logging.warn("Failed to add tracks to the playlist")
+        logging.error("Failed to add tracks to the playlist")
         logging.error("Response: %s", response.text)
         exit()
 
@@ -127,7 +126,7 @@ def create_and_populate_playlist(
     playlist_id = create_playlist(
         access_token, user_href, playlist_name, playlist_description, public
     )
-
+    time.sleep(5)
     if playlist_id:
         # Add tracks to the created playlist
         add_tracks_url = f"{user_href}/playlists/{playlist_id}/tracks"
@@ -150,7 +149,7 @@ def create_and_populate_playlist(
         if response.status_code == 201:
             logging.info("Tracks added to the playlist successfully")
         else:
-            logging.warn("Failed to add tracks to the playlist")
+            logging.error("Failed to add tracks to the playlist")
             logging.error("Response: %s", response.text)
     else:
         logging.error("Failed to create the playlist")
@@ -199,9 +198,7 @@ def create_playlist(
     else:
         # Request failed
         logging.error("Request failed with status code: %s %s", response.status_code, response.text)
-        if response.status_code == 429:
-            logging.warn("sleeping  30s because we get to many requests error")
-            time.sleep(30)
+        exit()
     return response_data["id"]
 
 
@@ -238,6 +235,7 @@ def get_user_items(access_token, item_type, limit=20, total_limit=10000):
     time_ranges = ["short_term", "medium_term", "long_term"]
     for time_range in time_ranges:
         for offset in range(0, total_limit, limit):
+            time.sleep(5)
             items = get_user_items_page(
                 access_token, item_type, limit, offset, time_range
             )
@@ -280,6 +278,7 @@ def get_all_tracks_from_playlists(access_token, playlists):
         "Authorization": f"Bearer {access_token}",
     }
     for playlist in playlists:
+        time.sleep(5)
         href = playlist["tracks"]["href"]
         response = requests.get(href, headers=headers)
         response_data = response.json()
@@ -355,10 +354,8 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist):
         return recommended_tracks["tracks"]
     else:
         # Request failed
-        logging.warn("Recommendation request failed with status code:", response.status_code, response.text)
-        if response.status_code == 429:
-            logging.warn("sleeping  30s because we get to many requests error")
-            time.sleep(30)
+        logging.error("Recommendation request failed with status code:", response.status_code, response.text)
+        exit()
     return []
 
 

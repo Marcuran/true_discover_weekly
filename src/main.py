@@ -38,6 +38,7 @@ def main():
     user_href = get_user_href(access_token)
     all_artists = get_all_artists_listenned_to(access_token)
     track_list = create_track_list(access_token, all_artists)
+
     create_and_populate_playlist(
         access_token,
         user_href,
