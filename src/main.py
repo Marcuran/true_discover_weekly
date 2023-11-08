@@ -24,7 +24,7 @@ def main():
         logging.error("Client ID not found in the .env file.")
         exit()
     
-    with open("access_token.json", "r") as f:
+    with open("../local_storage/access_token.json", "r") as f:
         access_token = json.load(f).strip()
 
     if not check_saved_access_token_valid(access_token):
@@ -36,15 +36,15 @@ def main():
             user-top-read, \
             user-read-recently-played",
         )
-        with open("access_token.json", "w") as f:
+        with open("../local_storage/access_token.json", "w") as f:
             json.dump(access_token, f)
 
     user_href = get_user_href(access_token)
     all_artists = get_all_artists_listenned_to(access_token)
     track_list = create_track_list(access_token, all_artists)
-    with open("track_list.json", "w") as f:
+    with open("../local_storage/track_list.json", "w") as f:
         json.dump(track_list, f)
-    with open("track_list.json", "r") as f:
+    with open("../local_storage/track_list.json", "r") as f:
         track_list = json.load(f)
     create_and_populate_playlist(
         access_token,
