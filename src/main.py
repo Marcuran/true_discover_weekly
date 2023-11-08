@@ -10,6 +10,7 @@ from spotify_api_interface import (
 from dotenv import load_dotenv
 import os
 import logging
+import json
 logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 def main():
@@ -21,24 +22,27 @@ def main():
     if not client_id:
         logging.error("Client ID not found in the .env file.")
         exit()
-    # TODO: reduce the scope to only necessary
     access_token = get_token(
         client_id,
-        "user-read-private, \
-        user-read-email, \
-        playlist-modify-public, \
-        playlist-modify-private, \
+        "playlist-modify-private, \
         playlist-read-private, \
         playlist-read-collaborative, \
         user-top-read, \
-        user-read-recently-played, \
-        user-library-modify, \
-        user-library-read",
+        user-read-recently-played",
     )
+
+    with open("access_token.json", "w") as f:
+        json.dump(access_token, f)
+    with open("access_token.json", "r") as f:
+        access_token = json.load(f).strip()
+
     user_href = get_user_href(access_token)
     all_artists = get_all_artists_listenned_to(access_token)
     track_list = create_track_list(access_token, all_artists)
-
+    with open("track_list.json", "w") as f:
+        json.dump(track_list, f)
+    with open("track_list.json", "r") as f:
+        track_list = json.load(f)
     create_and_populate_playlist(
         access_token,
         user_href,
