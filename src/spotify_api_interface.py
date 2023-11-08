@@ -17,11 +17,23 @@ code_verifier = "".join(
 )
 authorization_code = None
 
+def check_saved_access_token_valid(access_token: str):
+    private_info_url = "https://api.spotify.com/v1/me"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(private_info_url, headers=headers)
+    if response.status_code == 200:
+        logging.info("saved access token still valid")
+        return True
+    elif response.status_code == 401:
+        logging.info("saved access token not valid, need to request a new one")
+        return False
+    else:
+        logging.error("Response: %s", response.text)
+        exit()
 
 def get_token(
     client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"
 ):
-    # TODO cache access token
     """
     Generates an authorization URL and prompts the user to input the
     full URL with the authorization code.
@@ -110,7 +122,7 @@ def get_user_href(access_token):
         response_data = response.json()
         return response_data["href"]
     else:
-        logging.error("Failed to add tracks to the playlist")
+        logging.error("Failed to get user href")
         logging.error("Response: %s", response.text)
         exit()
 

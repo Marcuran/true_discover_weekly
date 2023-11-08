@@ -4,6 +4,7 @@ from spotify_api_interface import (
     get_all_artists_listenned_to,
     get_user_href,
     create_track_list,
+    check_saved_access_token_valid,
 )
 
 
@@ -22,19 +23,21 @@ def main():
     if not client_id:
         logging.error("Client ID not found in the .env file.")
         exit()
-    access_token = get_token(
-        client_id,
-        "playlist-modify-private, \
-        playlist-read-private, \
-        playlist-read-collaborative, \
-        user-top-read, \
-        user-read-recently-played",
-    )
-
-    with open("access_token.json", "w") as f:
-        json.dump(access_token, f)
+    
     with open("access_token.json", "r") as f:
         access_token = json.load(f).strip()
+
+    if not check_saved_access_token_valid(access_token):
+        access_token = get_token(
+            client_id,
+            "playlist-modify-private, \
+            playlist-read-private, \
+            playlist-read-collaborative, \
+            user-top-read, \
+            user-read-recently-played",
+        )
+        with open("access_token.json", "w") as f:
+            json.dump(access_token, f)
 
     user_href = get_user_href(access_token)
     all_artists = get_all_artists_listenned_to(access_token)
