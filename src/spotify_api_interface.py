@@ -275,7 +275,7 @@ def get_user_items_page(
             "limit": limit,
             "offset": offset,
         }
-        url = f"{base_url}/me/{item_type}"
+        url = f"{base_url}{item_type}"
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
