@@ -23,9 +23,17 @@ def main():
     if not client_id:
         logging.error("Client ID not found in the .env file.")
         exit()
-    
-    with open("../local_storage/access_token.json", "r") as f:
-        access_token = json.load(f).strip()
+
+    try:
+        with open("../local_storage/access_token.json", "r") as f:
+            access_token = json.load(f).strip()
+    except FileNotFoundError as e:
+        logging.warning("access_token.json not found")
+        access_token = "invalid token"
+    except json.decoder.JSONDecodeError as e:
+        logging.warning("access_token.json empty")
+        access_token = "invalid token"
+
     if not check_saved_access_token_valid(access_token):
         access_token = get_token(
             client_id,
