@@ -31,6 +31,7 @@ def check_saved_access_token_valid(access_token: str, url: str = "https://api.sp
         logging.error("Response: %s", response.text)
         exit()
 
+
 def get_token(
     client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"
 ):
@@ -268,7 +269,11 @@ def get_user_items_page(
     access_token, item_type, limit, offset, time_range="medium_term", base_url: str = "https://api.spotify.com/v1/me/"
 ):
     if item_type in ["tracks", "artists"]:
-        params = {"limit": limit, "offset": offset, "time_range": time_range}
+        params = {
+            "limit": limit, 
+            "offset": offset, 
+            "time_range": time_range
+        }
         url = f"{base_url}top/{item_type}"
     elif item_type == "playlists":
         params = {
@@ -362,6 +367,7 @@ def get_all_artists_from_playlists(access_token, playlists):
 
     return unique_artists
 
+
 def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -377,6 +383,7 @@ def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
             exit()
     
     return artist_list
+
 
 def get_all_artists_listenned_to(access_token):
     
@@ -460,6 +467,7 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist, recomm
         # Request failed
         logging.error("Recommendation request failed with status code:", response.status_code, response.text)
         exit()
+
 
 def create_track_list(access_token, all_artists, length=100):
     genres_dict = {}

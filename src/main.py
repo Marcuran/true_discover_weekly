@@ -26,7 +26,6 @@ def main():
     
     with open("../local_storage/access_token.json", "r") as f:
         access_token = json.load(f).strip()
-
     if not check_saved_access_token_valid(access_token):
         access_token = get_token(
             client_id,
