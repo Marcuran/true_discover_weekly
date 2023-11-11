@@ -17,8 +17,8 @@ code_verifier = "".join(
 )
 authorization_code = None
 
-def check_saved_access_token_valid(access_token: str):
-    private_info_url = "https://api.spotify.com/v1/me"
+def check_saved_access_token_valid(access_token: str, url: str = "https://api.spotify.com/v1/me"):
+    private_info_url = url
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(private_info_url, headers=headers)
     if response.status_code == 200:
@@ -30,6 +30,7 @@ def check_saved_access_token_valid(access_token: str):
     else:
         logging.error("Response: %s", response.text)
         exit()
+
 
 def get_token(
     client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"
@@ -104,7 +105,7 @@ def get_token(
     return access_token
 
 
-def get_user_href(access_token):
+def get_user_href(access_token: str, url: str = "https://api.spotify.com/v1/me"):
     """
     Retrieves the user's href (Spotify API endpoint) using the access token.
 
@@ -114,7 +115,7 @@ def get_user_href(access_token):
     Returns:
         str: User's href (Spotify API endpoint).
     """
-    private_info_url = "https://api.spotify.com/v1/me"
+    private_info_url = url
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(private_info_url, headers=headers)
     if response.status_code == 200:
@@ -215,13 +216,13 @@ def create_playlist(
     return response_data["id"]
 
 
-def get_user_playlist(access_token, offset, limit=20):
+def get_user_playlist(access_token, offset, limit=20, url: str = "https://api.spotify.com/v1/me/playlists"):
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
     params = {"limit": limit, "offset": offset}
-    url = "https://api.spotify.com/v1/me/playlists"
-    response = requests.get(url, headers=headers, params=params)
+    playlist_url = url
+    response = requests.get(playlist_url, headers=headers, params=params)
     response_data = response.json()
     return response_data.get("items", [])
 
@@ -265,17 +266,21 @@ def get_user_items(access_token, item_type, limit=20, total_limit=10000):
 
 
 def get_user_items_page(
-    access_token, item_type, limit, offset, time_range="medium_term"
+    access_token, item_type, limit, offset, time_range="medium_term", base_url: str = "https://api.spotify.com/v1/me/"
 ):
     if item_type in ["tracks", "artists"]:
-        params = {"limit": limit, "offset": offset, "time_range": time_range}
-        url = f"https://api.spotify.com/v1/me/top/{item_type}"
+        params = {
+            "limit": limit, 
+            "offset": offset, 
+            "time_range": time_range
+        }
+        url = f"{base_url}top/{item_type}"
     elif item_type == "playlists":
         params = {
             "limit": limit,
             "offset": offset,
         }
-        url = f"https://api.spotify.com/v1/me/{item_type}"
+        url = f"{base_url}{item_type}"
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
@@ -306,7 +311,8 @@ def get_all_tracks_from_playlists(access_token, playlists):
                 logging.error("Error: %s", e)
 
     return unique_tracks
-
+ 
+#TODO reduce the number of requests needed to the minimum, it is to high and after 2 runs it exceeds the rate
 def get_all_artists_from_playlists(access_token, playlists):
     unique_artist_hrefs = []
     unique_artists = []
@@ -342,18 +348,25 @@ def get_all_artists_from_playlists(access_token, playlists):
                 if artist_href is None:
                     print(artist["name"], " href : ", artist_href, " from playlist ", playlist["name"]," already in list of artists in playlists")
                 elif artist_href not in unique_artist_hrefs:
+                    time.sleep(0.5)
                     unique_artist_hrefs.append(artist_href)
                     response = requests.get(artist_href, headers=headers)
-                    try:
-                        artist_info = response.json()
-                        unique_artists.append(artist_info)
-                    except requests.exceptions.JSONDecodeError as e:
-                        logging.error("Error: %s", e)
+                    if response.status_code == 200:
+                        try:
+                            artist_info = response.json()
+                            unique_artists.append(artist_info)
+                        except requests.exceptions.JSONDecodeError as e:
+                            logging.error("Error: %s", e)
+                    else:
+                        # Request failed
+                        logging.error("Request failed with status code: %s %s", response.status_code, response.text)
+                        exit()
                 else:
                     print(artist["name"], " from playlist ", playlist["name"]," already in list of artists in playlists")
         time.sleep(5)
 
     return unique_artists
+
 
 def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
     headers = {
@@ -371,27 +384,28 @@ def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
     
     return artist_list
 
+
 def get_all_artists_listenned_to(access_token):
     
     logging.info("getting all top tracks ...")
     all_top_tracks = get_user_items(access_token, "tracks")
-    with open("all_top_tracks.json", "w") as f:
+    with open("../local_storage/all_top_tracks.json", "w") as f:
         json.dump(all_top_tracks, f)
-    with open("all_top_tracks.json", "r") as f:
+    with open("../local_storage/all_top_tracks.json", "r") as f:
         all_top_tracks = json.load(f)
     
     logging.info("getting all top artists ...")
     all_top_artists = get_user_items(access_token, "artists")
-    with open("all_top_artists.json", "w") as f:
+    with open("../local_storage/all_top_artists.json", "w") as f:
         json.dump(all_top_artists, f)
-    with open("all_top_artists.json", "r") as f:
+    with open("../local_storage/all_top_artists.json", "r") as f:
         all_top_artists = json.load(f)
 
     logging.info("getting all playlists ...")
     all_playlists = get_user_items(access_token, "playlists")
-    with open("all_playlists.json", "w") as f:
+    with open("../local_storage/all_playlists.json", "w") as f:
         json.dump(all_playlists, f)
-    with open("all_playlists.json", "r") as f:
+    with open("../local_storage/all_playlists.json", "r") as f:
         all_playlists = json.load(f)
 
     logging.info("getting all playlist artists ...")
@@ -399,9 +413,9 @@ def get_all_artists_listenned_to(access_token):
         access_token,
         all_playlists
     )
-    with open("all_playlists_artists.json", "w") as f:
+    with open("../local_storage/all_playlists_artists.json", "w") as f:
         json.dump(all_playlists_artists, f)
-    with open("all_playlists_artists.json", "r") as f:
+    with open("../local_storage/all_playlists_artists.json", "r") as f:
         all_playlists_artists = json.load(f)
     
     merged_artists = all_playlists_artists
@@ -417,9 +431,9 @@ def get_all_artists_listenned_to(access_token):
                 artist_hrefs_missing_full_info.append(artist_href)
 
     artists_from_top_tracks = get_artists_info_from_artist_hrefs(access_token, artist_hrefs_missing_full_info)
-    with open("artists_from_top_tracks.json", "w") as f:
+    with open("../local_storage/artists_from_top_tracks.json", "w") as f:
         json.dump(artists_from_top_tracks, f)
-    with open("artists_from_top_tracks.json", "r") as f:
+    with open("../local_storage/artists_from_top_tracks.json", "r") as f:
         artists_from_top_tracks = json.load(f)
     
     for artist in artists_from_top_tracks:
@@ -434,7 +448,7 @@ def get_all_artists_listenned_to(access_token):
     return merged_artists
 
 
-def get_recommendation_from_genre_and_artist(access_token, genre, artist):
+def get_recommendation_from_genre_and_artist(access_token, genre, artist, recommendation_url: str ="https://api.spotify.com/v1/recommendations"):
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
@@ -443,11 +457,7 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist):
     params["seed_genres"] = genre
     params["limit"] = 5
 
-    response = requests.get(
-        "https://api.spotify.com/v1/recommendations",
-        headers=headers,
-        params=params
-    )
+    response = requests.get(recommendation_url, headers=headers, params=params)
 
     if response.status_code == 200:
         response_data = response.json()
@@ -457,6 +467,7 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist):
         # Request failed
         logging.error("Recommendation request failed with status code:", response.status_code, response.text)
         exit()
+
 
 def create_track_list(access_token, all_artists, length=100):
     genres_dict = {}
