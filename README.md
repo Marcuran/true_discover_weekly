@@ -18,7 +18,7 @@ pip install -r requirements.txt
 
 1. rename the template.env file into .env
 2. Past your the Client ID you can find in the Web API dashboard of your project
-3. ```bash python python src/main.py```
+3. ```bash python python src/main.py --collect_data --create_playlist```
 4. Click on the link provided
 5. Approve the connection
 6. Copy the url when you will have approved the connection
