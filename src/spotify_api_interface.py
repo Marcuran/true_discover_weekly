@@ -391,34 +391,39 @@ def get_all_artists_listenned_to(access_token):
     all_top_tracks = get_user_items(access_token, "tracks")
     with open("../local_storage/all_top_tracks.json", "w") as f:
         json.dump(all_top_tracks, f)
-    with open("../local_storage/all_top_tracks.json", "r") as f:
-        all_top_tracks = json.load(f)
-    
+    # with open("../local_storage/all_top_tracks.json", "r") as f:
+    #     all_top_tracks = json.load(f)
+
     logging.info("getting all top artists ...")
     all_top_artists = get_user_items(access_token, "artists")
+    for artist in all_top_artists:    
+        artist.setdefault("sources", []).append("top_artists")
     with open("../local_storage/all_top_artists.json", "w") as f:
         json.dump(all_top_artists, f)
-    with open("../local_storage/all_top_artists.json", "r") as f:
-        all_top_artists = json.load(f)
+    # with open("../local_storage/all_top_artists.json", "r") as f:
+    #     all_top_artists = json.load(f)
 
     logging.info("getting all playlists ...")
     all_playlists = get_user_items(access_token, "playlists")
     with open("../local_storage/all_playlists.json", "w") as f:
         json.dump(all_playlists, f)
-    with open("../local_storage/all_playlists.json", "r") as f:
-        all_playlists = json.load(f)
+    # with open("../local_storage/all_playlists.json", "r") as f:
+    #     all_playlists = json.load(f)
 
     logging.info("getting all playlist artists ...")
     all_playlists_artists = get_all_artists_from_playlists(
         access_token,
         all_playlists
     )
+    for artist in merged_artists:
+        artist.setdefault("sources", []).append("playlists")
     with open("../local_storage/all_playlists_artists.json", "w") as f:
         json.dump(all_playlists_artists, f)
-    with open("../local_storage/all_playlists_artists.json", "r") as f:
-        all_playlists_artists = json.load(f)
+    # with open("../local_storage/all_playlists_artists.json", "r") as f:
+    #     all_playlists_artists = json.load(f)
     
     merged_artists = all_playlists_artists
+     
     temp_hrefs = [artist["href"] for artist in merged_artists]
     unique_artists_hrefs = set(temp_hrefs)
     artist_hrefs_missing_full_info = []
@@ -429,8 +434,16 @@ def get_all_artists_listenned_to(access_token):
             if artist_href not in unique_artists_hrefs:
                 unique_artists_hrefs.add(artist_href)
                 artist_hrefs_missing_full_info.append(artist_href)
+            else:
+                for merged_artist in merged_artists:
+                    if merged_artist["href"] == artist_href :
+                        if "top_tracks" not in merged_artist["sources"]:
+                            merged_artist.setdefault("sources", []).append("top_tracks")
+                        break
 
     artists_from_top_tracks = get_artists_info_from_artist_hrefs(access_token, artist_hrefs_missing_full_info)
+    for artist in artists_from_top_tracks:
+        artist.setdefault("sources", []).append("top_tracks")
     with open("../local_storage/artists_from_top_tracks.json", "w") as f:
         json.dump(artists_from_top_tracks, f)
     with open("../local_storage/artists_from_top_tracks.json", "r") as f:
@@ -444,6 +457,11 @@ def get_all_artists_listenned_to(access_token):
         if artist_href not in unique_artists_hrefs:
             unique_artists_hrefs.add(artist_href)
             merged_artists.append(artist)
+        else:
+            for merged_artist in merged_artists:
+                if merged_artist["href"] == artist_href:
+                    merged_artist.setdefault("sources", []).append("top_artists")
+                    break
 
     return merged_artists
 
@@ -465,7 +483,7 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist, recomm
         return recommended_tracks["tracks"]
     else:
         # Request failed
-        logging.error("Recommendation request failed with status code:", response.status_code, response.text)
+        logging.error("Recommendation request failed with status code: %s, %s", response.status_code, response.text)
         exit()
 
 
@@ -475,9 +493,13 @@ def create_track_list(access_token, all_artists, length=100):
         if "genres" in artist and artist["genres"]:
             for genre in artist["genres"]:
                 if genre not in genres_dict.keys():
-                    genres_dict[genre] = [artist["id"]]
+                    genres_dict[genre] = [ [
+                        artist["id"],
+                        artist["name"],
+                        artist["sources"]
+                    ]]
                 else:
-                    genres_dict[genre].append(artist["id"])
+                    genres_dict[genre].append([artist["id"],artist["name"],artist["sources"]])
     all_artists_ids = [artist["id"] for artist in all_artists]
     logging.info("number of music genres %s", len(genres_dict))
     logging.info("number of artist ids %s", len(all_artists_ids))
@@ -486,10 +508,20 @@ def create_track_list(access_token, all_artists, length=100):
     artists_in_track_list_already = []
     logging.info("cooking playlist ... (it will take at least 100s)")
     for _ in range(50):
-        random_genre = random.choice(list(genres_dict.keys()))
+        random_genre = random.choice(list(genres_dict.keys()))  
         random_artist = random.choice(genres_dict[random_genre])
+        random_artist_id = random_artist[0]
+        try:
+            random_artist_name =  random_artist[1]
+        except IndexError:
+            print(random_artist)
+            exit()
+        random_artiste_sources = random_artist[2]
         recommended_tracks = get_recommendation_from_genre_and_artist(
-            access_token, random_genre, random_artist
+            access_token, random_genre, random_artist_id
+        )
+        logging.info(
+            "artist sources %s", random_artiste_sources
         )
         for track in recommended_tracks:
             recommended_artist_ids_in_track = [
@@ -514,6 +546,9 @@ def create_track_list(access_token, all_artists, length=100):
                     )
             if add_track:
                 track_list.append(track)
+                logging.info(
+                    "%s recommended from %s , %s, added", track["name"], random_genre, random_artist_name
+                )
                 for artist_id in recommended_artist_ids_in_track:
                     artists_in_track_list_already.append(artist_id)
 
