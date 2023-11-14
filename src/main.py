@@ -8,6 +8,7 @@ from spotify_api_interface import (
 )
 
 
+import argparse
 from dotenv import load_dotenv
 import os
 import logging
@@ -15,6 +16,11 @@ import json
 logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 def main():
+    parser = argparse.ArgumentParser(description="User data collection and Playlist creation.")
+    parser.add_argument("--collect_data", action="store_true", help="Collect new data")
+    parser.add_argument("--create_playlist", action="store_true", help="Create playlist")
+
+    args = parser.parse_args()
     # Load environment variables from the .env file
     load_dotenv()
 
@@ -47,19 +53,27 @@ def main():
             json.dump(access_token, f)
 
     user_href = get_user_href(access_token)
-    all_artists = get_all_artists_listenned_to(access_token)
-    track_list = create_track_list(access_token, all_artists)
-    with open("../local_storage/track_list.json", "w") as f:
-        json.dump(track_list, f)
-    with open("../local_storage/track_list.json", "r") as f:
-        track_list = json.load(f)
-    create_and_populate_playlist(
-        access_token,
-        user_href,
-        track_list,
-        playlist_name="True discover weekly",
-        playlist_description="get truly never heard before music for you!",
-    )
+    if args.collect_data:
+        all_artists = get_all_artists_listenned_to(access_token)
+        with open("../local_storage/all_artists_listenned_to.json", "w") as f:
+            json.dump(all_artists, f)
+    else:
+        with open("../local_storage/all_artists_listenned_to.json", "r") as f:
+            all_artists = json.load(f)
+    
+    if args.create_playlist:
+        track_list = create_track_list(access_token, all_artists)
+        with open("../local_storage/track_list.json", "w") as f:
+            json.dump(track_list, f)
+        with open("../local_storage/track_list.json", "r") as f:
+            track_list = json.load(f)
+        create_and_populate_playlist(
+            access_token,
+            user_href,
+            track_list,
+            playlist_name="True discover weekly",
+            playlist_description="get truly never heard before music for you!",
+        )
 
 
 if __name__ == "__main__":
