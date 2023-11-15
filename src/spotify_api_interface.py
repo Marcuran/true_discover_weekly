@@ -487,7 +487,7 @@ def get_recommendation_from_genre_and_artist(access_token, genre, artist, recomm
         exit()
 
 
-def create_track_list(access_token, all_artists, length=100):
+def create_track_list(access_token, all_artists, no_recommendation_from_playlist_artists, length=100):
     genres_dict = {}
     for artist in all_artists:
         if "genres" in artist and artist["genres"]:
@@ -508,21 +508,27 @@ def create_track_list(access_token, all_artists, length=100):
     artists_in_track_list_already = []
     logging.info("cooking playlist ... (it will take at least 100s)")
     for _ in range(50):
-        random_genre = random.choice(list(genres_dict.keys()))  
-        random_artist = random.choice(genres_dict[random_genre])
-        random_artist_id = random_artist[0]
-        try:
-            random_artist_name =  random_artist[1]
-        except IndexError:
-            print(random_artist)
-            exit()
-        random_artiste_sources = random_artist[2]
+        choice_not_valid = True
+        while choice_not_valid: 
+            random_genre = random.choice(list(genres_dict.keys()))  
+            random_artist = random.choice(genres_dict[random_genre])
+            random_artist_id = random_artist[0]
+            random_artist_name = random_artist[1]
+            random_artist_sources = random_artist[2]
+            if no_recommendation_from_playlist_artists:
+                if random_artist_sources == ["playlists"]:
+                    choice_not_valid = True
+                else:
+                    choice_not_valid = False
+            else:
+                choice_not_valid = False
         recommended_tracks = get_recommendation_from_genre_and_artist(
             access_token, random_genre, random_artist_id
         )
         logging.info(
-            "artist sources %s", random_artiste_sources
+            "artist sources %s", random_artist_sources
         )
+
         for track in recommended_tracks:
             recommended_artist_ids_in_track = [
                 artist_in_track["id"] for artist_in_track in track["artists"]
