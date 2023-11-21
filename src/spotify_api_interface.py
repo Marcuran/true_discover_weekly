@@ -415,7 +415,7 @@ def get_all_artists_listenned_to(access_token):
         access_token,
         all_playlists
     )
-    for artist in merged_artists:
+    for artist in all_playlists_artists:
         artist.setdefault("sources", []).append("playlists")
     with open("../local_storage/all_playlists_artists.json", "w") as f:
         json.dump(all_playlists_artists, f)
