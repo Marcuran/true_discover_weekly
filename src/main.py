@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="User data collection and Playlist creation.")
     parser.add_argument("--collect_data", action="store_true", help="Collect new data")
     parser.add_argument("--create_playlist", action="store_true", help="Create playlist")
+    parser.add_argument("--no_recommendation_from_playlist_artists", action="store_true", help="do not include recommendations from playlist artists")
 
     args = parser.parse_args()
     # Load environment variables from the .env file
@@ -62,7 +63,7 @@ def main():
             all_artists = json.load(f)
     
     if args.create_playlist:
-        track_list = create_track_list(access_token, all_artists)
+        track_list = create_track_list(access_token, all_artists, args.no_recommendation_from_playlist_artists)
         with open("../local_storage/track_list.json", "w") as f:
             json.dump(track_list, f)
         with open("../local_storage/track_list.json", "r") as f:
