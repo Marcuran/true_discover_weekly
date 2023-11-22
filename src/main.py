@@ -30,6 +30,8 @@ def main():
         logging.error("Client ID not found in the .env file.")
         exit()
 
+    if not os.path.exists("../local_storage"):
+        os.makedirs("../local_storage")
     try:
         with open("../local_storage/access_token.json", "r") as f:
             access_token = json.load(f).strip()

@@ -346,7 +346,7 @@ def get_all_artists_from_playlists(access_token, playlists):
             for artist in track_artists:
                 artist_href = artist["href"]
                 if artist_href is None:
-                    print(artist["name"], " href : ", artist_href, " from playlist ", playlist["name"]," already in list of artists in playlists")
+                    pass
                 elif artist_href not in unique_artist_hrefs:
                     time.sleep(0.5)
                     unique_artist_hrefs.append(artist_href)
@@ -362,7 +362,7 @@ def get_all_artists_from_playlists(access_token, playlists):
                         logging.error("Request failed with status code: %s %s", response.status_code, response.text)
                         exit()
                 else:
-                    print(artist["name"], " from playlist ", playlist["name"]," already in list of artists in playlists")
+                    logging.info( "%s href : %s from playlist %s already in list of artists in playlists", artist["name"], artist_href, playlist["name"])
         time.sleep(5)
 
     return unique_artists

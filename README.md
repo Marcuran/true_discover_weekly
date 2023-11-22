@@ -4,8 +4,9 @@ This script will allow you to get a true new music discovery! An improved versio
 
 ## Before you start
 
-* Follow the get started steps in the [Spotify Web API](https://developer.spotify.com/documentation/web-api) page.
+* Log into the dashboard using your Spotify account (https://developer.spotify.com/dashboard).
 * Create a new project using your account with only Web API enabled
+* Add "http://localhost:8888/callback" and "http://localhost:8888" to the redirect uris
 
 ## Installation
 
@@ -17,12 +18,14 @@ pip install -r requirements.txt
 ## Running the code
 
 1. rename the template.env file into .env
-2. Past your the Client ID you can find in the Web API dashboard of your project
-3. ```bash python python src/main.py --collect_data --create_playlist```
-4. Click on the link provided
-5. Approve the connection
-6. Copy the url when you will have approved the connection
-7. Let the cook cook :) 
+2. copy your Client id you can find in the Web API dashboard of your project
+3. paste it in the /src/.env
+4. in a terminal from src run: 
+```python src/main.py --collect_data --create_playlist```
+5. Click on the link provided
+6. Approve the connection
+7. Copy the url when you will have approved the connection
+8. Let the cook cook :) 
 
 ## License
 
