@@ -14,8 +14,17 @@ import os
 import logging
 import json
 from datetime import datetime
-logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+import sys 
 
+logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+# Add a stream handler to log to the terminal
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)  # Set the desired log level for terminal output
+console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+
+# Add the console handler to the root logger
+logging.getLogger().addHandler(console_handler)
 def main():
     parser = argparse.ArgumentParser(description="User data collection and Playlist creation.")
     parser.add_argument("--collect_data", action="store_true", help="Collect new data")
