@@ -560,6 +560,6 @@ def create_track_list(access_token, all_artists, no_recommendation_from_playlist
 
         if len(track_list) > length:
             break
-        time.sleep(5)
+        time.sleep(0.5)
     logging.info("cooking finished :)")
     return track_list
