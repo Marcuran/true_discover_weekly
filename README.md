@@ -27,7 +27,7 @@ python src/main.py --collect_data --create_playlist
 5. Click on the link provided
 6. Approve the connection
 7. Copy the url when you will have approved the connection
-8. Let the cook cook :) 
+8. Let the cook cook :)
 
 ## License
 
