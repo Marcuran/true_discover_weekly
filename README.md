@@ -24,10 +24,10 @@ pip install -r requirements.txt
 ```bash
 python src/main.py --collect_data --create_playlist
 ```
-6. Click on the link provided
-7. Approve the connection
-8. Copy the url when you will have approved the connection
-9. Let the cook cook :) 
+5. Click on the link provided
+6. Approve the connection
+7. Copy the url when you will have approved the connection
+8. Let the cook cook :)
 
 ## License
 

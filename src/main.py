@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import os
 import logging
 import json
+from datetime import datetime
 logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 def main():
@@ -70,11 +71,13 @@ def main():
             json.dump(track_list, f)
         with open("../local_storage/track_list.json", "r") as f:
             track_list = json.load(f)
+        now = datetime.now().strftime("%d/%m/%Y %H:%M")
+        playlist_name = "True discover weekly " + now
         create_and_populate_playlist(
             access_token,
             user_href,
             track_list,
-            playlist_name="True discover weekly",
+            playlist_name=playlist_name,
             playlist_description="get truly never heard before music for you!",
         )
 
