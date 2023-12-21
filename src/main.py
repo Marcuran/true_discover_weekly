@@ -14,22 +14,33 @@ import os
 import logging
 import json
 from datetime import datetime
-import sys 
+import sys
 
-logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    filename="app.log",
+    filemode="w",
+    format="%(name)s - %(levelname)s - %(message)s",
+)
 # Add a stream handler to log to the terminal
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.DEBUG)  # Set the desired log level for terminal output
-console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+console_formatter = logging.Formatter("%(levelname)s - %(message)s")
 console_handler.setFormatter(console_formatter)
 
 # Add the console handler to the root logger
 logging.getLogger().addHandler(console_handler)
+
+
 def main():
     parser = argparse.ArgumentParser(description="User data collection and Playlist creation.")
     parser.add_argument("--collect_data", action="store_true", help="Collect new data")
     parser.add_argument("--create_playlist", action="store_true", help="Create playlist")
-    parser.add_argument("--no_recommendation_from_playlist_artists", action="store_true", help="do not include recommendations from playlist artists")
+    parser.add_argument(
+        "--no_recommendation_from_playlist_artists",
+        action="store_true",
+        help="do not include recommendations from playlist artists",
+    )
 
     args = parser.parse_args()
     # Load environment variables from the .env file
@@ -46,10 +57,10 @@ def main():
     try:
         with open("../local_storage/access_token.json", "r") as f:
             access_token = json.load(f).strip()
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         logging.warning("access_token.json not found")
         access_token = "invalid token"
-    except json.decoder.JSONDecodeError as e:
+    except json.decoder.JSONDecodeError:
         logging.warning("access_token.json empty")
         access_token = "invalid token"
 
@@ -73,7 +84,7 @@ def main():
     else:
         with open("../local_storage/all_artists_listenned_to.json", "r") as f:
             all_artists = json.load(f)
-    
+
     if args.create_playlist:
         track_list = create_track_list(access_token, all_artists, args.no_recommendation_from_playlist_artists)
         with open("../local_storage/track_list.json", "w") as f:
