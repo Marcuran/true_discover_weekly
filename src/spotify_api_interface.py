@@ -8,9 +8,9 @@ import requests
 import time
 import logging
 import json
+from typing import Any
 
 LENGTH = 16
-code_verifier = "".join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=128))
 authorization_code = None
 
 
@@ -28,6 +28,59 @@ def check_saved_access_token_valid(access_token: str, url: str = "https://api.sp
         logging.error("Response: %s", response.text)
         exit()
 
+def get_token_link(client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"):
+    """
+    Generates an authorization URL and prompts the user to input the
+    full URL with the authorization code.
+    Retrieves an access token using the authorization code.
+
+    Args:
+        client_id (str): Client ID obtained from the Spotify
+            Developer Dashboard.
+        scope (str): Scopes required for accessing
+            Spotify API endpoints.
+        redirect_uri (str): Redirect URI specified in the
+            Spotify Developer Dashboard.
+
+    Returns:
+        authorize_url (str): Authorize_url generated
+        code_verifier (str): code verifier used
+    """
+    global authorization_code
+    code_verifier = "".join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=128))
+    code_verifier_storage = code_verifier
+    letters_and_digits = string.ascii_letters + string.digits
+    state = "".join(random.choice(letters_and_digits) for _ in range(LENGTH))
+    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).decode().rstrip("=")
+
+    args = {
+        "response_type": "code",
+        "client_id": client_id,
+        "scope": scope,
+        "redirect_uri": redirect_uri,
+        "state": state,
+        "code_challenge_method": "S256",
+        "code_challenge": code_challenge,
+    }
+
+    query_string = urlencode(args)
+    authorize_url = "https://accounts.spotify.com/authorize?" + query_string
+    return authorize_url, code_verifier_storage
+
+def get_access_token(client_id:str,authorization_code:str ,redirect_uri: str,code_verifier_storage: str)->str:
+    token_url = "https://accounts.spotify.com/api/token"
+
+    token_params = {
+        "grant_type": "authorization_code",
+        "code": authorization_code,
+        "redirect_uri": redirect_uri,
+        "client_id": client_id,
+        "code_verifier": code_verifier_storage,
+    }
+    response = requests.post(token_url, data=token_params)
+    response_data = response.json()
+    access_token = response_data.get("access_token")
+    return access_token
 
 def get_token(client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"):
     """
@@ -47,28 +100,8 @@ def get_token(client_id: str, scope: str, redirect_uri="http://localhost:8888/ca
         access_token (str): Access token if the authorization is successful,
             None otherwise.
     """
-    global authorization_code
-
-    letters_and_digits = string.ascii_letters + string.digits
-    state = "".join(random.choice(letters_and_digits) for _ in range(LENGTH))
-    code_verifier_storage = code_verifier
-    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).decode().rstrip("=")
-
-    args = {
-        "response_type": "code",
-        "client_id": client_id,
-        "scope": scope,
-        "redirect_uri": redirect_uri,
-        "state": state,
-        "code_challenge_method": "S256",
-        "code_challenge": code_challenge,
-    }
-
-    query_string = urlencode(args)
-    authorize_url = "https://accounts.spotify.com/authorize?" + query_string
-
+    authorize_url, code_verifier_storage = get_token_link(client_id,scope,redirect_uri)
     print(authorize_url)
-
     authorization_url = input("Enter the full authorization URL: ")
     parsed_url = urlparse.urlparse(authorization_url)
     query_params = parse_qs(parsed_url.query)
@@ -78,20 +111,8 @@ def get_token(client_id: str, scope: str, redirect_uri="http://localhost:8888/ca
         logging.error("Authorization code not found in the URL.")
         return None
 
-    token_url = "https://accounts.spotify.com/api/token"
-
-    token_params = {
-        "grant_type": "authorization_code",
-        "code": authorization_code,
-        "redirect_uri": redirect_uri,
-        "client_id": client_id,
-        "code_verifier": code_verifier_storage,
-    }
-
-    response = requests.post(token_url, data=token_params)
-    response_data = response.json()
-
-    access_token = response_data.get("access_token")
+    access_token = get_access_token(client_id,authorization_code,redirect_uri,code_verifier_storage)
+    
     return access_token
 
 
