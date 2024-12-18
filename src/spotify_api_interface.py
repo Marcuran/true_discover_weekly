@@ -138,7 +138,6 @@ def get_user_href(access_token: str, url: str = "https://api.spotify.com/v1/me")
         logging.error("Response: %s", response.text)
         exit()
 
-
 def create_and_populate_playlist(
     access_token,
     user_href,
@@ -404,38 +403,51 @@ def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
     return artist_list
 
 
-def get_all_artists_listenned_to(access_token):
-    logging.info("getting all top tracks ...")
-    all_top_tracks = get_user_items(access_token, "tracks")
-    with open("../local_storage/all_top_tracks.json", "w") as f:
-        json.dump(all_top_tracks, f)
-    # with open("../local_storage/all_top_tracks.json", "r") as f:
-    #     all_top_tracks = json.load(f)
+def get_all_artists_listenned_to(access_token, store_local = True, local_folder_name = "../local_storage", fetch_local=False):
 
+    logging.info("getting all top tracks ...")
+    if fetch_local:
+        with open(f"{local_folder_name}/all_top_tracks", "r") as f:
+            all_top_tracks = json.load(f)
+    else:
+        all_top_tracks = get_user_items(access_token, "tracks", limit=20,total_limit=20)
+        if store_local:
+            with open(f"{local_folder_name}/all_top_tracks", "w") as f:
+                json.dump(all_top_tracks, f)
+    
     logging.info("getting all top artists ...")
-    all_top_artists = get_user_items(access_token, "artists")
-    for artist in all_top_artists:
-        artist.setdefault("sources", []).append("top_artists")
-    with open("../local_storage/all_top_artists.json", "w") as f:
-        json.dump(all_top_artists, f)
-    # with open("../local_storage/all_top_artists.json", "r") as f:
-    #     all_top_artists = json.load(f)
+    if fetch_local:
+        with open(f"{local_folder_name}/all_top_artists.json", "r") as f:
+            all_top_artists = json.load(f)
+    else:
+        all_top_artists = get_user_items(access_token, "artists", limit=20,total_limit=20)
+        for artist in all_top_artists:
+            artist.setdefault("sources", []).append("top_artists")
+        if store_local:
+            with open(f"{local_folder_name}/all_top_artists.json", "w") as f:
+                json.dump(all_top_artists, f)
 
     logging.info("getting all playlists ...")
-    all_playlists = get_user_items(access_token, "playlists")
-    with open("../local_storage/all_playlists.json", "w") as f:
-        json.dump(all_playlists, f)
-    # with open("../local_storage/all_playlists.json", "r") as f:
-    #     all_playlists = json.load(f)
+    if fetch_local:
+        with open(f"{local_folder_name}/all_playlists.json", "r", limit=20,total_limit=20) as f:
+            all_playlists = json.load(f)
+    else:
+        all_playlists = get_user_items(access_token, "playlists")
+        if store_local:
+            with open(f"{local_folder_name}all_playlists.json", "w") as f:
+                json.dump(all_playlists, f)
 
     logging.info("getting all playlist artists ...")
-    all_playlists_artists = get_all_artists_from_playlists(access_token, all_playlists)
-    for artist in all_playlists_artists:
-        artist.setdefault("sources", []).append("playlists")
-    with open("../local_storage/all_playlists_artists.json", "w") as f:
-        json.dump(all_playlists_artists, f)
-    # with open("../local_storage/all_playlists_artists.json", "r") as f:
-    #     all_playlists_artists = json.load(f)
+    if fetch_local:
+        with open(f"{local_folder_name}/all_playlists_artists.json", "r") as f:
+            all_playlists_artists = json.load(f)
+    else:
+        all_playlists_artists = get_all_artists_from_playlists(access_token, all_playlists)
+        for artist in all_playlists_artists:
+            artist.setdefault("sources", []).append("playlists")
+        if store_local:
+            with open(f"{local_folder_name}/all_playlists_artists.json", "w") as f:
+                json.dump(all_playlists_artists, f)
 
     merged_artists = all_playlists_artists
 
@@ -456,14 +468,17 @@ def get_all_artists_listenned_to(access_token):
                             merged_artist.setdefault("sources", []).append("top_tracks")
                         break
 
-    artists_from_top_tracks = get_artists_info_from_artist_hrefs(access_token, artist_hrefs_missing_full_info)
-    for artist in artists_from_top_tracks:
-        artist.setdefault("sources", []).append("top_tracks")
-    with open("../local_storage/artists_from_top_tracks.json", "w") as f:
-        json.dump(artists_from_top_tracks, f)
-    with open("../local_storage/artists_from_top_tracks.json", "r") as f:
-        artists_from_top_tracks = json.load(f)
-
+    if fetch_local:
+        with open(f"{local_folder_name}/artists_from_top_tracks.json", "r") as f:
+            artists_from_top_tracks = json.load(f)
+    else:
+        artists_from_top_tracks = get_artists_info_from_artist_hrefs(access_token, artist_hrefs_missing_full_info)
+        for artist in artists_from_top_tracks:
+            artist.setdefault("sources", []).append("top_tracks")
+        if store_local:
+            with open(f"{local_folder_name}/artists_from_top_tracks.json", "w") as f:
+                json.dump(artists_from_top_tracks, f)
+    
     for artist in artists_from_top_tracks:
         merged_artists.append(artist)
 
