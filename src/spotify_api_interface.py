@@ -407,12 +407,12 @@ def get_all_artists_listenned_to(access_token, store_local = True, local_folder_
 
     logging.info("getting all top tracks ...")
     if fetch_local:
-        with open(f"{local_folder_name}/all_top_tracks", "r") as f:
+        with open(f"{local_folder_name}/all_top_tracks.json", "r") as f:
             all_top_tracks = json.load(f)
     else:
-        all_top_tracks = get_user_items(access_token, "tracks", limit=20,total_limit=20)
+        all_top_tracks = get_user_items(access_token, "tracks")
         if store_local:
-            with open(f"{local_folder_name}/all_top_tracks", "w") as f:
+            with open(f"{local_folder_name}/all_top_tracks.json", "w") as f:
                 json.dump(all_top_tracks, f)
     
     logging.info("getting all top artists ...")
@@ -420,7 +420,7 @@ def get_all_artists_listenned_to(access_token, store_local = True, local_folder_
         with open(f"{local_folder_name}/all_top_artists.json", "r") as f:
             all_top_artists = json.load(f)
     else:
-        all_top_artists = get_user_items(access_token, "artists", limit=20,total_limit=20)
+        all_top_artists = get_user_items(access_token, "artists")
         for artist in all_top_artists:
             artist.setdefault("sources", []).append("top_artists")
         if store_local:
@@ -429,7 +429,7 @@ def get_all_artists_listenned_to(access_token, store_local = True, local_folder_
 
     logging.info("getting all playlists ...")
     if fetch_local:
-        with open(f"{local_folder_name}/all_playlists.json", "r", limit=20,total_limit=20) as f:
+        with open(f"{local_folder_name}/all_playlists.json", "r") as f:
             all_playlists = json.load(f)
     else:
         all_playlists = get_user_items(access_token, "playlists")
