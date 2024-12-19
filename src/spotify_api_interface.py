@@ -11,10 +11,9 @@ import json
 from typing import Any
 
 LENGTH = 16
-authorization_code = None
 
 
-def check_saved_access_token_valid(access_token: str, url: str = "https://api.spotify.com/v1/me"):
+def check_access_token_valid(access_token: str, url: str = "https://api.spotify.com/v1/me"):
     private_info_url = url
     headers = {"Authorization": f"Bearer {access_token}"}
     response = requests.get(private_info_url, headers=headers)
@@ -26,9 +25,12 @@ def check_saved_access_token_valid(access_token: str, url: str = "https://api.sp
         return False
     else:
         logging.error("Response: %s", response.text)
-        exit()
+        raise NotImplementedError
 
-def get_token_link(client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"):
+
+def get_token_link(
+    client_id: str, scope: str, code_verifier: str, redirect_uri="http://localhost:8888/callback"
+) -> str:
     """
     Generates an authorization URL and prompts the user to input the
     full URL with the authorization code.
@@ -46,9 +48,6 @@ def get_token_link(client_id: str, scope: str, redirect_uri="http://localhost:88
         authorize_url (str): Authorize_url generated
         code_verifier (str): code verifier used
     """
-    global authorization_code
-    code_verifier = "".join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=128))
-    code_verifier_storage = code_verifier
     letters_and_digits = string.ascii_letters + string.digits
     state = "".join(random.choice(letters_and_digits) for _ in range(LENGTH))
     code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).decode().rstrip("=")
@@ -65,9 +64,10 @@ def get_token_link(client_id: str, scope: str, redirect_uri="http://localhost:88
 
     query_string = urlencode(args)
     authorize_url = "https://accounts.spotify.com/authorize?" + query_string
-    return authorize_url, code_verifier_storage
+    return authorize_url
 
-def get_access_token(client_id:str,authorization_code:str ,redirect_uri: str,code_verifier_storage: str)->str:
+
+def get_access_token(client_id: str, authorization_code: str, redirect_uri: str, code_verifier: str) -> str:
     token_url = "https://accounts.spotify.com/api/token"
 
     token_params = {
@@ -75,44 +75,11 @@ def get_access_token(client_id:str,authorization_code:str ,redirect_uri: str,cod
         "code": authorization_code,
         "redirect_uri": redirect_uri,
         "client_id": client_id,
-        "code_verifier": code_verifier_storage,
+        "code_verifier": code_verifier,
     }
     response = requests.post(token_url, data=token_params)
     response_data = response.json()
     access_token = response_data.get("access_token")
-    return access_token
-
-def get_token(client_id: str, scope: str, redirect_uri="http://localhost:8888/callback"):
-    """
-    Generates an authorization URL and prompts the user to input the
-    full URL with the authorization code.
-    Retrieves an access token using the authorization code.
-
-    Args:
-        client_id (str): Client ID obtained from the Spotify
-            Developer Dashboard.
-        scope (str): Scopes required for accessing
-            Spotify API endpoints.
-        redirect_uri (str): Redirect URI specified in the
-            Spotify Developer Dashboard.
-
-    Returns:
-        access_token (str): Access token if the authorization is successful,
-            None otherwise.
-    """
-    authorize_url, code_verifier_storage = get_token_link(client_id,scope,redirect_uri)
-    print(authorize_url)
-    authorization_url = input("Enter the full authorization URL: ")
-    parsed_url = urlparse.urlparse(authorization_url)
-    query_params = parse_qs(parsed_url.query)
-    authorization_code = query_params.get("code", [None])[0]
-
-    if not authorization_code:
-        logging.error("Authorization code not found in the URL.")
-        return None
-
-    access_token = get_access_token(client_id,authorization_code,redirect_uri,code_verifier_storage)
-    
     return access_token
 
 
@@ -136,7 +103,8 @@ def get_user_href(access_token: str, url: str = "https://api.spotify.com/v1/me")
     else:
         logging.error("Failed to get user href")
         logging.error("Response: %s", response.text)
-        exit()
+        raise NotImplementedError
+
 
 def create_and_populate_playlist(
     access_token,
@@ -344,8 +312,6 @@ def get_all_artists_from_playlists(access_token, playlists):
         params = {"limit": limit, "offset": offset}
         response = requests.get(href, params=params, headers=headers)
         response_data = response.json()
-        nb_api_calls+=1
-
         tracks_in_playlist.extend(response_data.get("items", []))
 
         # get all artists in the tracks present in the playlist
@@ -358,7 +324,7 @@ def get_all_artists_from_playlists(access_token, playlists):
                     pass
                 elif artist_href not in unique_artist_hrefs:
                     unique_artist_hrefs.append(artist_href)
-                    all_artists_to_add.append(artist_id)                 
+                    all_artists_to_add.append(artist_id)
                 else:
                     logging.info(
                         "%s href : %s from playlist %s already in list of artists in playlists",
@@ -369,20 +335,20 @@ def get_all_artists_from_playlists(access_token, playlists):
         time.sleep(5)
 
     # get all the artists in the playlist
-    for i in range((len(all_artists_to_add) // max_number_of_artists_to_ask)-1):
-        comma_separated_list_string = ",".join((all_artists_to_add[max_number_of_artists_to_ask * i: max_number_of_artists_to_ask * (i+1)]))
+    for i in range((len(all_artists_to_add) // max_number_of_artists_to_ask) - 1):
+        comma_separated_list_string = ",".join(
+            (all_artists_to_add[max_number_of_artists_to_ask * i : max_number_of_artists_to_ask * (i + 1)])
+        )
         params = {"ids": comma_separated_list_string}
         response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
         response_data = response.json()
         unique_artists.extend(response_data.get("artists", []))
-    if len(all_artists_to_add) >0:
-        comma_separated_list_string = ",".join(all_artists_to_add[max_number_of_tracks_to_return * (i + 1):-1])
+    if len(all_artists_to_add) > 0:
+        comma_separated_list_string = ",".join(all_artists_to_add[max_number_of_tracks_to_return * (i + 1) : -1])
         params = {"ids": comma_separated_list_string}
         response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
-        nb_api_calls+=1
         response_data = response.json()
         unique_artists.extend(response_data.get("artists", []))
-    logging.info(f"nb of api calls for get_all_artists_from_playlist {nb_api_calls}")
     return unique_artists
 
 
@@ -407,8 +373,9 @@ def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
     return artist_list
 
 
-def get_all_artists_listenned_to(access_token, store_local = True, local_folder_name = "../local_storage", fetch_local=False):
-
+def get_all_artists_listenned_to(
+    access_token, store_local=True, local_folder_name="../local_storage", fetch_local=False
+):
     logging.info("getting all top tracks ...")
     if fetch_local:
         with open(f"{local_folder_name}/all_top_tracks.json", "r") as f:
@@ -418,7 +385,7 @@ def get_all_artists_listenned_to(access_token, store_local = True, local_folder_
         if store_local:
             with open(f"{local_folder_name}/all_top_tracks.json", "w") as f:
                 json.dump(all_top_tracks, f)
-    
+
     logging.info("getting all top artists ...")
     if fetch_local:
         with open(f"{local_folder_name}/all_top_artists.json", "r") as f:
@@ -482,7 +449,7 @@ def get_all_artists_listenned_to(access_token, store_local = True, local_folder_
         if store_local:
             with open(f"{local_folder_name}/artists_from_top_tracks.json", "w") as f:
                 json.dump(artists_from_top_tracks, f)
-    
+
     for artist in artists_from_top_tracks:
         merged_artists.append(artist)
 
