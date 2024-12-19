@@ -429,12 +429,12 @@ def get_all_artists_listenned_to(access_token, store_local = True, local_folder_
 
     logging.info("getting all playlists ...")
     if fetch_local:
-        with open(f"{local_folder_name}/all_playlists.json", "r", limit=20,total_limit=20) as f:
+        with open(f"{local_folder_name}/all_playlists.json", "r") as f:
             all_playlists = json.load(f)
     else:
         all_playlists = get_user_items(access_token, "playlists")
         if store_local:
-            with open(f"{local_folder_name}all_playlists.json", "w") as f:
+            with open(f"{local_folder_name}/all_playlists.json", "w") as f:
                 json.dump(all_playlists, f)
 
     logging.info("getting all playlist artists ...")
