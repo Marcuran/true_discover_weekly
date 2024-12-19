@@ -321,11 +321,12 @@ def get_all_tracks_from_playlists(access_token, playlists):
 def get_all_artists_from_playlists(access_token, playlists):
     unique_artist_hrefs = []
     unique_artists = []
+    all_artists_to_add = []
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
     max_number_of_tracks_to_return = 50
-
+    max_number_of_artists_to_ask = 50
     for playlist in playlists:
         href = playlist["tracks"]["href"]
         number_of_tracks = playlist["tracks"]["total"]
@@ -343,33 +344,21 @@ def get_all_artists_from_playlists(access_token, playlists):
         params = {"limit": limit, "offset": offset}
         response = requests.get(href, params=params, headers=headers)
         response_data = response.json()
+        nb_api_calls+=1
+
         tracks_in_playlist.extend(response_data.get("items", []))
 
         # get all artists in the tracks present in the playlist
         for track in tracks_in_playlist:
             track_artists = track["track"]["artists"]
             for artist in track_artists:
+                artist_id = artist["id"]
                 artist_href = artist["href"]
-                if artist_href is None:
+                if artist_id is None:
                     pass
                 elif artist_href not in unique_artist_hrefs:
-                    time.sleep(0.5)
                     unique_artist_hrefs.append(artist_href)
-                    response = requests.get(artist_href, headers=headers)
-                    if response.status_code == 200:
-                        try:
-                            artist_info = response.json()
-                            unique_artists.append(artist_info)
-                        except requests.exceptions.JSONDecodeError as e:
-                            logging.error("Error: %s", e)
-                    else:
-                        # Request failed
-                        logging.error(
-                            "Request failed with status code: %s %s",
-                            response.status_code,
-                            response.text,
-                        )
-                        exit()
+                    all_artists_to_add.append(artist_id)                 
                 else:
                     logging.info(
                         "%s href : %s from playlist %s already in list of artists in playlists",
@@ -379,6 +368,21 @@ def get_all_artists_from_playlists(access_token, playlists):
                     )
         time.sleep(5)
 
+    # get all the artists in the playlist
+    for i in range((len(all_artists_to_add) // max_number_of_artists_to_ask)-1):
+        comma_separated_list_string = ",".join((all_artists_to_add[max_number_of_artists_to_ask * i: max_number_of_artists_to_ask * (i+1)]))
+        params = {"ids": comma_separated_list_string}
+        response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
+        response_data = response.json()
+        unique_artists.extend(response_data.get("artists", []))
+    if len(all_artists_to_add) >0:
+        comma_separated_list_string = ",".join(all_artists_to_add[max_number_of_tracks_to_return * (i + 1):-1])
+        params = {"ids": comma_separated_list_string}
+        response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
+        nb_api_calls+=1
+        response_data = response.json()
+        unique_artists.extend(response_data.get("artists", []))
+    logging.info(f"nb of api calls for get_all_artists_from_playlist {nb_api_calls}")
     return unique_artists
 
 
