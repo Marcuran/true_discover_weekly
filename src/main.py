@@ -3,7 +3,7 @@ from spotify_api_interface import (
     get_all_artists_listenned_to,
     create_track_list,
 )
-from true_discover import trueDiscover
+from true_discover import true_discover
 
 
 import argparse
@@ -61,7 +61,7 @@ def main():
     except json.decoder.JSONDecodeError:
         logging.warning("access_token.json empty")
         access_token = None
-    true_discover = trueDiscover(client_id, access_token=access_token)
+    true_discover = true_discover(client_id, access_token=access_token)
     if not true_discover.check_stored_access_token_still_valid():
         access_token = true_discover.get_access_token_through_terminal()
         with open("../local_storage/access_token.json", "w") as f:

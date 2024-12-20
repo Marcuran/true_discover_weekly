@@ -11,7 +11,31 @@ import json
 from typing import Any
 
 LENGTH = 16
+SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE = 401
 
+
+class spotifyAccessTokenNotValidError(Exception):
+    def __init__(self):
+        pass
+
+
+class getUserItemsInterruptedError(Exception):
+    def __init__(self, collected_items, offset, time_ranges_left):
+        self.collected_items = collected_items
+        self.offset = offset
+        self.time_ranges_left = time_ranges_left
+
+
+class getPlaylistArtistInterrupterError(Exception):
+    def __init__(self, playlists_left=[], artists_to_add_ids=[], artists_collected=[]):
+        self.collected_artists_to_add_ids = artists_to_add_ids
+        self.artists_collected = artists_collected
+        self.playlists_left = playlists_left
+
+class getArtistsInterrupterError(Exception):
+    def __init__(self, artists_left_to_add_ids= [],artists_collected= []):
+        self.artists_left_to_add_ids = artists_left_to_add_ids
+        self.artists_collected = artists_collected
 
 def check_access_token_valid(access_token: str, url: str = "https://api.spotify.com/v1/me"):
     private_info_url = url
@@ -20,9 +44,9 @@ def check_access_token_valid(access_token: str, url: str = "https://api.spotify.
     if response.status_code == 200:
         logging.info("saved access token still valid")
         return True
-    elif response.status_code == 401:
+    elif response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
         logging.info("saved access token not valid, need to request a new one")
-        return False
+        raise spotifyAccessTokenNotValidError()
     else:
         logging.error("Response: %s", response.text)
         raise NotImplementedError
@@ -200,39 +224,34 @@ def get_user_playlist(access_token, offset, limit=20, url: str = "https://api.sp
     return response_data.get("items", [])
 
 
-def get_user_items(access_token, item_type, limit=20, total_limit=10000):
-    """
-    Retrieves the user's top items (tracks or artists) with pagination support.
-
-    Args:
-        access_token (str): Access token for authenticating API requests.
-        user_href (str): User's Spotify API endpoint.
-        item_type (str): Type of items to retrieve ('tracks' or 'artists').
-        limit (int, optional): The maximum number of items to retrieve
-            per request. Defaults to 20.
-        total_limit (int, optional): The maximum number of total
-        items to retrieve. Defaults to 10000.
-
-    Returns:
-        list: A list of dictionaries representing the user's top items.
-    """
+def get_user_items(
+    access_token,
+    item_type,
+    limit=20,
+    total_limit=10000,
+    start_offset=0,
+    time_ranges=["short_term", "medium_term", "long_term"],
+):
     unique_item_ids = set()
     unique_items = []
 
-    time_ranges = ["short_term", "medium_term", "long_term"]
-    for time_range in time_ranges:
-        for offset in range(0, total_limit, limit):
+    for time_range_id in range(len(time_ranges)):
+        for offset in range(start_offset, total_limit, limit):
             time.sleep(5)
-            items = get_user_items_page(access_token, item_type, limit, offset, time_range)
-            for item in items:
-                item_id = item["id"]
-                if item_id not in unique_item_ids:
-                    unique_item_ids.add(item_id)
-                    unique_items.append(item)
+            try:
+                items = get_user_items_page(access_token, item_type, limit, offset, time_ranges[time_range_id])
+                for item in items:
+                    item_id = item["id"]
+                    if item_id not in unique_item_ids:
+                        unique_item_ids.add(item_id)
+                        unique_items.append(item)
 
-            if len(items) < limit:
-                break
-
+                if len(items) < limit:
+                    break
+            except spotifyAccessTokenNotValidError:
+                raise getUserItemsInterruptedError(
+                    collected_items=unique_items, offset=offset, time_ranges_left=time_ranges[time_range_id:-1]
+                )
     return unique_items
 
 
@@ -258,7 +277,12 @@ def get_user_items_page(
     }
     response = requests.get(url, headers=headers, params=params)
     response_data = response.json()
-    return response_data.get("items", [])
+    if response.status_code == 200:
+        return response_data.get("items", [])
+    elif response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
+        raise spotifyAccessTokenNotValidError()
+    else:
+        raise NotImplementedError
 
 
 def get_all_tracks_from_playlists(access_token, playlists):
@@ -285,17 +309,16 @@ def get_all_tracks_from_playlists(access_token, playlists):
     return unique_tracks
 
 
-# TODO reduce the number of requests needed to the minimum, it is to high and after 2 runs it exceeds the rate
-def get_all_artists_from_playlists(access_token, playlists):
+def get_all_artists_from_playlists(access_token, playlists, all_artists_to_add=[]):
     unique_artist_hrefs = []
     unique_artists = []
-    all_artists_to_add = []
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
     max_number_of_tracks_to_return = 50
     max_number_of_artists_to_ask = 50
-    for playlist in playlists:
+    for playlist_id in range(len(playlists)):
+        playlist = playlists[playlist_id]
         href = playlist["tracks"]["href"]
         number_of_tracks = playlist["tracks"]["total"]
         tracks_in_playlist = []
@@ -306,12 +329,18 @@ def get_all_artists_from_playlists(access_token, playlists):
             params = {"limit": max_number_of_tracks_to_return, "offset": offset}
             response = requests.get(href, params=params, headers=headers)
             response_data = response.json()
+            if response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
+                raise getPlaylistArtistInterrupterError(
+                    playlists_left=playlists[playlist_id:-1], all_artists_to_add=all_artists_to_add
+                )
             tracks_in_playlist.extend(response_data.get("items", []))
         offset = max_number_of_tracks_to_return * (i + 1)
         limit = number_of_tracks % max_number_of_tracks_to_return
         params = {"limit": limit, "offset": offset}
         response = requests.get(href, params=params, headers=headers)
         response_data = response.json()
+        if response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
+            raise getPlaylistArtistInterrupterError(playlists[playlist_id:-1], all_artists_to_add=all_artists_to_add)
         tracks_in_playlist.extend(response_data.get("items", []))
 
         # get all artists in the tracks present in the playlist
@@ -335,41 +364,42 @@ def get_all_artists_from_playlists(access_token, playlists):
         time.sleep(5)
 
     # get all the artists in the playlist
-    for i in range((len(all_artists_to_add) // max_number_of_artists_to_ask) - 1):
-        comma_separated_list_string = ",".join(
-            (all_artists_to_add[max_number_of_artists_to_ask * i : max_number_of_artists_to_ask * (i + 1)])
-        )
-        params = {"ids": comma_separated_list_string}
-        response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
-        response_data = response.json()
-        unique_artists.extend(response_data.get("artists", []))
-    if len(all_artists_to_add) > 0:
-        comma_separated_list_string = ",".join(all_artists_to_add[max_number_of_tracks_to_return * (i + 1) : -1])
-        params = {"ids": comma_separated_list_string}
-        response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
-        response_data = response.json()
-        unique_artists.extend(response_data.get("artists", []))
+    try:
+        unique_artists = get_artists_info_from_artist_ids(access_token=access_token,artist_ids=all_artists_to_add)
+    except getArtistsInterrupterError as e:
+        raise getPlaylistArtistInterrupterError(artists_to_add_ids=e.artists_left_to_add_ids, artists_collected=e.artists_collected)
     return unique_artists
 
 
-def get_artists_info_from_artist_hrefs(access_token, artist_hrefs):
+def get_artists_info_from_artist_ids(access_token, artist_ids):
     headers = {
         "Authorization": f"Bearer {access_token}",
     }
+    max_number_of_artists_to_ask = 50
     artist_list = []
-    for artist_href in artist_hrefs:
-        response = requests.get(artist_href, headers=headers)
-        if response.status_code == 200:
-            artist_list.append(response.json())
-        else:
-            # Request failed
-            logging.error(
-                "Request failed with status code: %s %s",
-                response.status_code,
-                response.text,
+    i = 0
+    for i in range((len(artist_ids) // max_number_of_artists_to_ask) - 1):
+        comma_separated_list_string = ",".join(
+            (artist_ids[max_number_of_artists_to_ask * i : max_number_of_artists_to_ask * (i + 1)])
+        )
+        params = {"ids": comma_separated_list_string}
+        response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
+        if response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
+            raise getArtistsInterrupterError(
+                artists_left_to_add_ids=artist_ids[i:-1], artists_collected=artist_list
             )
-            exit()
-
+        response_data = response.json()
+        artist_list.extend(response_data.get("artists", []))
+    if len(artist_ids) > i*max_number_of_artists_to_ask:
+        comma_separated_list_string = ",".join(artist_ids[max_number_of_artists_to_ask * (i + 1) : -1])
+        params = {"ids": comma_separated_list_string}
+        response = requests.get(f"https://api.spotify.com/v1/artists", params=params, headers=headers)
+        if response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
+            raise getArtistsInterrupterError(
+                artists_left_to_add_ids=artist_ids[i:-1], artists_collected=artist_list
+            )
+        response_data = response.json()
+        artist_list.extend(response_data.get("artists", []))
     return artist_list
 
 
@@ -443,7 +473,7 @@ def get_all_artists_listenned_to(
         with open(f"{local_folder_name}/artists_from_top_tracks.json", "r") as f:
             artists_from_top_tracks = json.load(f)
     else:
-        artists_from_top_tracks = get_artists_info_from_artist_hrefs(access_token, artist_hrefs_missing_full_info)
+        artists_from_top_tracks = get_artists_info_from_artist_ids(access_token, artist_hrefs_missing_full_info)
         for artist in artists_from_top_tracks:
             artist.setdefault("sources", []).append("top_tracks")
         if store_local:
