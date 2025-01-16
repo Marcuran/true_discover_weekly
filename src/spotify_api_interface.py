@@ -26,7 +26,7 @@ class getUserItemsInterruptedError(Exception):
         self.time_ranges_left = time_ranges_left
 
 
-class getPlaylistArtistInterrupterError(Exception):
+class getPlaylistArtistInterruptedError(Exception):
     def __init__(self, playlists_left=[], artists_to_add_ids=[], artists_collected=[]):
         self.collected_artists_to_add_ids = artists_to_add_ids
         self.artists_collected = artists_collected
@@ -36,6 +36,10 @@ class getArtistsInterrupterError(Exception):
     def __init__(self, artists_left_to_add_ids= [],artists_collected= []):
         self.artists_left_to_add_ids = artists_left_to_add_ids
         self.artists_collected = artists_collected
+
+class collectMissingArtistsInterruptedError(Exception):
+    def __init__(self):
+        pass
 
 def check_access_token_valid(access_token: str, url: str = "https://api.spotify.com/v1/me"):
     private_info_url = url
@@ -330,7 +334,7 @@ def get_all_artists_from_playlists(access_token, playlists, all_artists_to_add=[
             response = requests.get(href, params=params, headers=headers)
             response_data = response.json()
             if response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
-                raise getPlaylistArtistInterrupterError(
+                raise getPlaylistArtistInterruptedError(
                     playlists_left=playlists[playlist_id:-1], all_artists_to_add=all_artists_to_add
                 )
             tracks_in_playlist.extend(response_data.get("items", []))
@@ -340,7 +344,7 @@ def get_all_artists_from_playlists(access_token, playlists, all_artists_to_add=[
         response = requests.get(href, params=params, headers=headers)
         response_data = response.json()
         if response.status_code == SPOTIFY_ACCESS_TOKEN_NOT_VALID_ERROR_CODE:
-            raise getPlaylistArtistInterrupterError(playlists[playlist_id:-1], all_artists_to_add=all_artists_to_add)
+            raise getPlaylistArtistInterruptedError(playlists[playlist_id:-1], all_artists_to_add=all_artists_to_add)
         tracks_in_playlist.extend(response_data.get("items", []))
 
         # get all artists in the tracks present in the playlist
@@ -367,7 +371,7 @@ def get_all_artists_from_playlists(access_token, playlists, all_artists_to_add=[
     try:
         unique_artists = get_artists_info_from_artist_ids(access_token=access_token,artist_ids=all_artists_to_add)
     except getArtistsInterrupterError as e:
-        raise getPlaylistArtistInterrupterError(artists_to_add_ids=e.artists_left_to_add_ids, artists_collected=e.artists_collected)
+        raise getPlaylistArtistInterruptedError(artists_to_add_ids=e.artists_left_to_add_ids, artists_collected=e.artists_collected)
     return unique_artists
 
 

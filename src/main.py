@@ -3,8 +3,9 @@ from spotify_api_interface import (
     get_all_artists_listenned_to,
     create_track_list,
 )
-from true_discover import true_discover
+from true_discover import TrueDiscover, interruptionError
 
+MAX_ERRORS = 10
 
 import argparse
 from dotenv import load_dotenv
@@ -29,7 +30,6 @@ console_handler.setFormatter(console_formatter)
 # Add the console handler to the root logger
 logging.getLogger().addHandler(console_handler)
 
-
 def main():
     parser = argparse.ArgumentParser(description="User data collection and Playlist creation.")
     parser.add_argument("--collect_data", action="store_true", help="Collect new data")
@@ -37,61 +37,119 @@ def main():
     parser.add_argument(
         "--no_recommendation_from_playlist_artists",
         action="store_true",
-        help="do not include recommendations from playlist artists",
+        help="Do not include recommendations from playlist artists",
     )
 
     args = parser.parse_args()
-    # Load environment variables from the .env file
-    load_dotenv()
+    load_dotenv()  # Load environment variables from the .env file
 
-    # Access the client ID from the environment
     client_id = os.getenv("CLIENT_ID")
     if not client_id:
         logging.error("Client ID not found in the .env file.")
         exit()
 
+    # Ensure local storage directory exists
     if not os.path.exists("../local_storage"):
+        logging.info("Creating local storage directory.")
         os.makedirs("../local_storage")
+
+    # Load access token from file
     try:
         with open("../local_storage/access_token.json", "r") as f:
             access_token = json.load(f).strip()
+            logging.info("Access token successfully loaded.")
     except FileNotFoundError:
-        logging.warning("access_token.json not found")
+        logging.warning("access_token.json not found.")
         access_token = None
     except json.decoder.JSONDecodeError:
-        logging.warning("access_token.json empty")
+        logging.warning("access_token.json is empty or invalid.")
         access_token = None
-    true_discover = true_discover(client_id, access_token=access_token)
+
+    true_discover = TrueDiscover(client_id, access_token=access_token)
+
+    # Check if the stored access token is valid
     if not true_discover.check_stored_access_token_still_valid():
-        access_token = true_discover.get_access_token_through_terminal()
-        with open("../local_storage/access_token.json", "w") as f:
-            json.dump(access_token, f)
+        logging.info("Stored access token is invalid or expired. Starting authorization process.")
+        try:
+            access_token = true_discover.get_access_token_through_terminal()
+            with open("../local_storage/access_token.json", "w") as f:
+                json.dump(access_token, f)
+                logging.info("New access token successfully saved.")
+        except Exception as e:
+            logging.error(f"Failed to retrieve access token: {e}")
+            exit()
+
+    resume = False
+    retries_remaining = MAX_ERRORS
 
     if args.collect_data:
-        all_artists = get_all_artists_listenned_to(true_discover.access_token)
-        with open("../local_storage/all_artists_listenned_to.json", "w") as f:
-            json.dump(all_artists, f)
+        logging.info("Starting data collection process.")
+        while retries_remaining > 0:
+            try:
+                all_artists = true_discover.data_collection(resume=resume)
+                logging.info("Data collection completed successfully.")
+                break
+            except interruptionError:
+                logging.warning(f"Data collection interrupted. Resuming... {retries_remaining - 1} retries left.")
+                resume = True
+                retries_remaining -= 1
+
+        if retries_remaining == 0:
+            logging.error("Max retries reached. Data collection failed.")
+            exit()
+
+        # Save collected artist data
+        try:
+            with open("../local_storage/all_artists_listenned_to.json", "w") as f:
+                json.dump(all_artists, f)
+                logging.info("All artists data successfully saved.")
+        except Exception as e:
+            logging.error(f"Failed to save artist data: {e}")
+            exit()
     else:
-        with open("../local_storage/all_artists_listenned_to.json", "r") as f:
-            all_artists = json.load(f)
+        logging.info("Loading previously collected artist data.")
+        try:
+            with open("../local_storage/all_artists_listenned_to.json", "r") as f:
+                all_artists = json.load(f)
+                logging.info("Artist data loaded successfully.")
+        except FileNotFoundError:
+            logging.error("Artist data file not found. Run with --collect_data to gather data first.")
+            exit()
+        except json.decoder.JSONDecodeError:
+            logging.error("Artist data file is invalid. Run with --collect_data to gather data first.")
+            exit()
 
     if args.create_playlist:
-        user_href = true_discover.get_user_href()
-        track_list = create_track_list(access_token, all_artists, args.no_recommendation_from_playlist_artists)
-        with open("../local_storage/track_list.json", "w") as f:
-            json.dump(track_list, f)
-        with open("../local_storage/track_list.json", "r") as f:
-            track_list = json.load(f)
-        now = datetime.now().strftime("%d/%m/%Y %H:%M")
-        playlist_name = "True discover weekly " + now
-        create_and_populate_playlist(
-            access_token,
-            user_href,
-            track_list,
-            playlist_name=playlist_name,
-            playlist_description="get truly never heard before music for you!",
-        )
+        logging.info("Starting playlist creation process.")
+        try:
+            user_href = true_discover.get_user_href()
+            track_list = create_track_list(access_token, all_artists, args.no_recommendation_from_playlist_artists)
 
+            # Save track list to file
+            with open("../local_storage/track_list.json", "w") as f:
+                json.dump(track_list, f)
+                logging.info("Track list successfully saved.")
+
+            # Reload track list to confirm
+            with open("../local_storage/track_list.json", "r") as f:
+                track_list = json.load(f)
+                logging.debug("Track list successfully reloaded from file.")
+
+            now = datetime.now().strftime("%d/%m/%Y %H:%M")
+            playlist_name = f"True Discover Weekly {now}"
+
+            # Create and populate playlist
+            create_and_populate_playlist(
+                access_token,
+                user_href,
+                track_list,
+                playlist_name=playlist_name,
+                playlist_description="Get truly never-heard-before music for you!",
+            )
+            logging.info(f"Playlist '{playlist_name}' created successfully.")
+        except Exception as e:
+            logging.error(f"Failed to create playlist: {e}")
+            exit()
 
 if __name__ == "__main__":
     main()
