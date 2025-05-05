@@ -1,3 +1,6 @@
+!!!! not working because spotify doesn't allow for recommendations api to be used with this type of account anymore :(
+
+
 # True Music Discovery
 
 This script will allow you to get a true new music discovery! An improved version of your Discovery Weekly
